@@ -1,8 +1,10 @@
-﻿using ServiceStack.Redis;
+﻿using ServiceStack;
+using ServiceStack.Redis;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,8 +14,41 @@ namespace RedisClientTest
     {
         static void Main(string[] args)
         {
+            #region 注册 破解6000次
+            var licenseUtils = typeof(LicenseUtils);
+            var members = licenseUtils.FindMembers(MemberTypes.All, BindingFlags.NonPublic | BindingFlags.Static, null, null);
+            Type activatedLicenseType = null;
+            foreach (var memberInfo in members)
+            {
+                if (memberInfo.Name.Equals("__activatedLicense", StringComparison.OrdinalIgnoreCase) && memberInfo is FieldInfo fieldInfo)
+                    activatedLicenseType = fieldInfo.FieldType;
+            }
+
+            if (activatedLicenseType != null)
+            {
+                var licenseKey = new LicenseKey
+                {
+                    Expiry = DateTime.Today.AddYears(100),
+                    Ref = "ServiceStack",
+                    Name = "Enterprise",
+                    Type = LicenseType.Enterprise
+                };
+
+                var constructor = activatedLicenseType.GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null, new[] { typeof(LicenseKey) }, null);
+                if (constructor != null)
+                {
+                    var activatedLicense = constructor.Invoke(new object[] { licenseKey });
+                    var activatedLicenseField = licenseUtils.GetField("__activatedLicense", BindingFlags.NonPublic | BindingFlags.Static);
+                    if (activatedLicenseField != null)
+                        activatedLicenseField.SetValue(null, activatedLicense);
+                }
+
+                Console.WriteLine(licenseKey.ToJson());
+            }
+            #endregion
+
             //创建比较器
-            var comparator= TaskComparator.GetInstance(1000);
+            var comparator = TaskComparator.GetInstance(1000);
 
             //ServiceStack.Redis
             RedisClient redisClient = new RedisClient("192.168.8.204", 6379, "superrd", 0);
